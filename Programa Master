@@ -1,0 +1,652 @@
+// Inclusão de bibliotecas
+#include <A2a.h>
+#include <Wire.h>
+
+#include <LiquidCrystal_I2C.h>
+//Inicializa o display no endereco 0x27
+LiquidCrystal_I2C lcd(0x27,16,2);
+
+//Endereço dos escravos
+#define endereco1 10 //ecravo 1
+#define endereco2 12 //escravo 2
+
+/////// Variaveis constante de inicialização ///////
+// Master Saidas
+#define s1      A0    //Bomba Elevatoria de entrada 1
+#define s2      A1    //Bomba Elevatoria de entrada 2
+#define s3      A2    //Valvula do Balancin OFF > BOX 1 / ON > BOX2
+#define s4      A3    //Aerador 1 BOX 1
+#define s5       8    //Aerador 2 BOX 2
+
+//E1 Saidas
+#define s6      A0    //Valvula de descarte 1 BOX 1
+#define s7      A1    //Valvula de descarte 2 BOX 2
+#define s8      A2    //Bomba do lodo BOX 1
+#define s9      A3    //Bomba do lobo BOX 2
+#define s10      8    //Bomba de descarte 1 AZUL
+
+//E2 Saidas
+#define s11     A0    //Bomba de descarte 2 SUBMERSA
+#define s12     A1    //Dosadora de Cloro
+#define s13     A2   
+#define s14     A3    
+#define s15      8    
+
+
+//Master Entradas
+#define b1   2    //Botao acionamento BOMBA ELEVATORIA 1
+#define b2   3    //Botao acionamento BOMBA ELEVATORIA 2
+#define b3   4    //Botao acionamento VALVULA BALANCIN
+#define b4   5    //Botao acionamento AERADOR 1
+#define b5   6    //Botao acionamento AERADOR 2
+#define ch1  7    //on para MANUAL off AUTOMATICO
+
+//E1 Entradas
+#define b6   2    //Botao acionamento VALVULA DE DESCARTE 1
+#define b7   3    //Botao acionamento VALVULA DE DESCARTE 2
+#define b8   4    //Botao acionamento BOMBA DE LODO 1
+#define b9   5    //Botao acionamento BOMBA DE LODO 2
+#define b10  6    //Botao acionamento BOMBA DE DESCARTE 1
+#define b11  7    //Botao acionamento BOMBA DE DESCARTE 2
+
+
+//E2 Entradas 
+const int boiaEntradaCheia = 2;   //Boia eletronica caixa de entrada cheia
+const int boiaEntradaVazio = 3;    //Boia eletronica caixa de entrada vazio
+const int boiaBox1Cheia    = 4;    //Boia eletronica BOX1 cheia
+const int boiaBox1Vazio    = 5;    //Boia eletronica BOX1 vazio
+const int boiaBox2Cheia    = 6;    //Boia eletronica BOX2 cheia
+const int boiaBox2Vazio    = 7;    //Boia eletronica BOX2 vazio
+
+//Sub-programa de retenção de botão
+bool pinBotao1Retencao();
+bool pinBotao2Retencao();
+bool pinBotao3Retencao();
+bool pinBotao4Retencao();
+bool pinBotao5Retencao();
+bool pinBotao6Retencao();
+bool pinBotao7Retencao();
+bool pinBotao8Retencao();
+bool pinBotao9Retencao();
+bool pinBotao10Retencao();
+bool pinBotao11Retencao();
+
+//Variaveis de estados dos BOX
+int estadobox1 = 0;
+int estadobox2 = 0;
+
+//Tempos dos estagios AUTOMATICO
+unsigned long tempo1 = millis();
+unsigned long tempo2 = millis();
+unsigned long tempo3 = millis();
+unsigned long tempo4 = millis();
+unsigned long tempo5 = millis();
+unsigned long tempo6 = millis();
+
+//Programa de funcionamento MANUAL
+void manual();
+
+//Programa de funcionamento AUTOMATICO
+void automatico();
+
+
+
+//Iniciando Objetos
+A2a arduinoSlave;
+
+
+void setup() 
+{
+  Wire.begin();
+
+  lcd.init();
+  lcd.begin(16, 2);
+  
+  Serial.begin(9600);
+
+  while (!Serial); // Leonardo: wait for serial monitor
+ 
+  arduinoSlave.begin();
+ 
+  //pinMode para Master
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+  pinMode(s4, OUTPUT);
+  pinMode(s5, OUTPUT);
+  pinMode(b1, INPUT_PULLUP);
+  pinMode(b2, INPUT_PULLUP);
+  pinMode(b3, INPUT_PULLUP);
+  pinMode(b4, INPUT_PULLUP);
+  pinMode(b5, INPUT_PULLUP);
+  pinMode(ch1, INPUT_PULLUP);
+
+  //pinMode PARA O E1
+  arduinoSlave.pinWireMode(endereco1, b6,  INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco1, b7,  INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco1, b8,  INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco1, b9,  INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco1, b10, INPUT_PULLUP); 
+  arduinoSlave.pinWireMode(endereco1, b11, INPUT_PULLUP); 
+  arduinoSlave.pinWireMode(endereco1, s6,  OUTPUT);
+  arduinoSlave.pinWireMode(endereco1, s7,  OUTPUT);
+  arduinoSlave.pinWireMode(endereco1, s8,  OUTPUT);
+  arduinoSlave.pinWireMode(endereco1, s9,  OUTPUT);
+  arduinoSlave.pinWireMode(endereco1, s10, OUTPUT);
+  arduinoSlave.digitalWireWrite(endereco1, s6, LOW);
+  arduinoSlave.digitalWireWrite(endereco1, s7, LOW);
+  arduinoSlave.digitalWireWrite(endereco1, s8, LOW);
+  arduinoSlave.digitalWireWrite(endereco1, s9, LOW);
+  arduinoSlave.digitalWireWrite(endereco1, s10, LOW);
+
+
+  //pinMode PARA O E2
+  arduinoSlave.pinWireMode(endereco2, boiaEntradaCheia, INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco2, boiaEntradaVazio, INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco2, boiaBox1Cheia,    INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco2, boiaBox1Vazio,    INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco2, boiaBox2Cheia,    INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco2, boiaBox2Vazio,    INPUT_PULLUP);
+  arduinoSlave.pinWireMode(endereco2, s11, OUTPUT);
+  arduinoSlave.pinWireMode(endereco2, s12, OUTPUT); 
+  arduinoSlave.digitalWireWrite(endereco2, s11, LOW);
+  arduinoSlave.digitalWireWrite(endereco2, s12, LOW);
+  arduinoSlave.digitalWireWrite(endereco2, s13, LOW);
+  arduinoSlave.digitalWireWrite(endereco2, s14, LOW);
+  arduinoSlave.digitalWireWrite(endereco2, s15, LOW);
+
+  tempo1 = millis();
+  tempo2 = millis();
+  tempo3 = millis();
+  tempo4 = millis();
+  tempo6 = millis();
+  
+}
+
+void loop() {
+ 
+  while(digitalRead(7)==0) // Acionamento da função MANUAL
+  {
+    manual();
+   }
+
+while(digitalRead(7)==1) // Acionamento da função AUTOMATICO
+  {
+    Serial.println("automatico");
+    lcd.setBacklight(HIGH);
+    lcd.setCursor(15,0);
+    lcd.print("A");
+    lcd.setCursor(15,1);
+    lcd.print("T");
+    automatico();
+  } 
+}
+
+//PROGRAMA MANUAL
+void manual(){        
+  Serial.println("manual");
+
+  lcd.setBacklight(HIGH);
+  lcd.setCursor(0,0);
+  lcd.print("     MANUAL     ");
+  lcd.setCursor(0,1);
+  lcd.print(" ETE - THERMAS  ");  
+
+  // Rotina de acionamento manual por botoes
+    if (pinBotao1Retencao()) {
+      digitalWrite(s1, LOW);
+   } else {
+      digitalWrite(s1, HIGH);
+   } 
+
+    if (pinBotao2Retencao()) {
+      digitalWrite(s2, LOW);
+   } else {
+      digitalWrite(s2, HIGH);
+   } 
+
+    if (pinBotao3Retencao()) {
+      digitalWrite(s3, LOW);
+   } else {
+      digitalWrite(s3, HIGH);
+   } 
+    
+    if (pinBotao4Retencao()) {
+      digitalWrite(s4, LOW);
+   } else {
+      digitalWrite(s4, HIGH);
+   } 
+
+    if (pinBotao5Retencao()) {
+      digitalWrite(s5, LOW);
+   } else {
+      digitalWrite(s5, HIGH);
+   } 
+
+    if (pinBotao6Retencao()) {
+      arduinoSlave.digitalWireWrite(endereco1, s6, LOW);
+   } else {
+      arduinoSlave.digitalWireWrite(endereco1, s6, HIGH);
+   }
+
+    if (pinBotao7Retencao()) {
+      arduinoSlave.digitalWireWrite(endereco1, s7, LOW);
+   } else {
+      arduinoSlave.digitalWireWrite(endereco1, s7, HIGH);
+   }
+
+    if (pinBotao8Retencao()) {
+      arduinoSlave.digitalWireWrite(endereco1, s8, LOW);
+   } else {
+      arduinoSlave.digitalWireWrite(endereco1, s8, HIGH);
+   }
+   
+    if (pinBotao9Retencao()) {
+      arduinoSlave.digitalWireWrite(endereco1, s9, LOW);
+   } else {
+      arduinoSlave.digitalWireWrite(endereco1, s9, HIGH);
+   } 
+
+    if (pinBotao10Retencao()) {
+      arduinoSlave.digitalWireWrite(endereco1, s10, LOW);
+   } else {
+      arduinoSlave.digitalWireWrite(endereco1, s10, HIGH);
+   } 
+
+    if (pinBotao11Retencao()) {
+      arduinoSlave.digitalWireWrite(endereco2, s11, LOW);
+   } else {
+      arduinoSlave.digitalWireWrite(endereco2, s11, HIGH);
+   } 
+
+}
+
+bool pinBotao1Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = digitalRead(b1);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao2Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = digitalRead(b2);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao3Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = digitalRead(b3);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao4Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = digitalRead(b4);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao5Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = digitalRead(b5);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao6Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = arduinoSlave.digitalWireRead(endereco1, b6);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao7Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = arduinoSlave.digitalWireRead(endereco1, b7);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao8Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = arduinoSlave.digitalWireRead(endereco1, b8);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao9Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = arduinoSlave.digitalWireRead(endereco1, b9);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao10Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = arduinoSlave.digitalWireRead(endereco1, b10);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+bool pinBotao11Retencao() {
+   #define tempoDebounce 50 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+
+   bool estadoBotao;
+   static bool estadoBotaoAnt; 
+   static bool estadoRet = true;
+   static unsigned long delayBotao = 0;
+
+   if ( (millis() - delayBotao) > tempoDebounce ) {
+       estadoBotao = arduinoSlave.digitalWireRead(endereco1, b11);
+       if ( estadoBotao && (estadoBotao != estadoBotaoAnt) ) {
+          estadoRet = !estadoRet;
+          delayBotao = millis();
+       }
+       estadoBotaoAnt = estadoBotao;
+   }
+   return estadoRet;
+}
+
+//PROGRAMA AUTOMATICO
+void automatico(){
+  int entradaCheia = arduinoSlave.digitalWireRead(endereco2, boiaEntradaCheia);
+  int entradaVazia = arduinoSlave.digitalWireRead(endereco2, boiaEntradaVazio);
+  int box1Cheia = arduinoSlave.digitalWireRead(endereco2, boiaBox1Cheia);
+  int box1Vazia = arduinoSlave.digitalWireRead(endereco2, boiaBox1Vazio);
+  int box2Cheia = arduinoSlave.digitalWireRead(endereco2, boiaBox2Cheia);
+  int box2Vazia = arduinoSlave.digitalWireRead(endereco2, boiaBox2Vazio);
+  
+  
+  if(estadobox1 == 0){//BOX1 decanta BOX2 batelada1
+        if((millis()- tempo1)>10000){// tempo 1 hora e 20 minutos
+            estadobox1=1;
+            tempo2 = millis();
+        }
+      
+  }else if(estadobox1 == 1){//BOX1 descarte BOX2 batelada2
+        if(((millis()- tempo2)>10000) && (box1Cheia == LOW)){// tempo 1 hora e 20 minutos
+            estadobox1=2;
+            tempo3 = millis();
+        }
+        
+  }else if(estadobox1 == 2){//BOX1 abastece BOX2 batelada3 
+        if(((millis()- tempo3)>10000) && (box1Cheia == HIGH)){// tempo 1 hora e 20 minutos
+            estadobox1=3;
+            tempo4 = millis();
+        }
+         
+  } else if(estadobox1 == 3){//BOX1 batelada1 BOX2 decanta
+        if((millis()- tempo4)>10000){// tempo 1 hora e 20 minutos
+            estadobox1=4;
+            tempo5 = millis();
+        }
+  
+  }else if(estadobox1 == 4){//BOX1 batelada2 BOX2 descarte
+        if(((millis()- tempo5)>10000) && (box2Cheia == LOW)){// tempo 1 hora e 20 minutos
+            estadobox1=5;
+            tempo6 = millis();
+        }
+  }else if(estadobox1 == 5){//BOX1 batelada3 BOX2 abastece
+        if(((millis()- tempo6)>10000) && (box2Cheia == HIGH)){// tempo 1 hora e 20 minutos
+            estadobox1=0;
+            tempo1 = millis();
+        }
+  }
+
+
+  switch (estadobox1){
+    
+    case 0://BOX1 decanta BOX2 batelada1
+        lcd.setCursor(0,0);
+        lcd.print("BOX1:Decanta ");
+        digitalWrite(s4,LOW);//AERADOR1 OFF
+        lcd.setCursor(0,1);
+        lcd.print("BOX2:Batelada ");
+        digitalWrite(s5,HIGH);//AERADOR2 ON
+        digitalWrite(s1,LOW);//BOMBA DE ENTRADA1 OFF
+        digitalWrite(s2,LOW);//BOMBA DE ENTRADA2 OFF        
+        break;
+
+    case 1://BOX1 descarte BOX2 batelada2
+        if(box1Cheia == HIGH){
+          lcd.setCursor(0,0);
+          lcd.print("BOX1:Descarte ");
+          arduinoSlave.digitalWireWrite(endereco1, s6,HIGH);//VALVULA DESCARTE BOX1 ON
+          arduinoSlave.digitalWireWrite(endereco2, s12, HIGH);//DOSADORA CLORO ON
+          lcd.setCursor(0,1);
+          lcd.print("BOX2:Batelada ");
+          digitalWrite(s5,HIGH);//AERADOR2 ON
+        }else if(box1Cheia == LOW){
+          lcd.setCursor(0,0);
+          lcd.print("BOX1:Descarte ");
+          arduinoSlave.digitalWireWrite(endereco1, s6,LOW);//VALVULA DESCARTE BOX1 OFF
+          arduinoSlave.digitalWireWrite(endereco2, s12, LOW);//DOSADORA CLORO OFF
+          lcd.setCursor(0,1);
+          lcd.print("BOX2:Batelada ");
+          digitalWrite(s5,HIGH);//AERADOR2 ON
+        }       
+        break;
+
+    case 2://BOX1 abastece BOX2 batelada3
+        if(box1Cheia == LOW){
+          if(entradaCheia == HIGH){
+            lcd.setCursor(0,0);
+            lcd.print("BOX1:Abastece ");
+            digitalWrite(s1,HIGH);//BOMBA DE ENTRADA1 ON
+            digitalWrite(s2,HIGH);//BOMBA DE ENTRADA2 ON
+            digitalWrite(s3,LOW);//VALVULA BALANCIM OFF -> BOX1
+            lcd.setCursor(0,1);
+            lcd.print("BOX2:Batelada ");
+            digitalWrite(s5,HIGH);//AERADOR2 ON
+          }else {
+            lcd.setCursor(0,0);
+            lcd.print("BOX1:Abastece ");
+            digitalWrite(s1,LOW);//BOMBA DE ENTRADA1 OFF
+            digitalWrite(s2,LOW);//BOMBA DE ENTRADA2 OFF
+            digitalWrite(s3,LOW);//VALVULA BALANCIM OFF ->BOX1
+            lcd.setCursor(0,1);
+            lcd.print("BOX2:Batelada ");
+            digitalWrite(s5,HIGH);//AERADOR2 ON
+          }
+        }else if(box1Cheia == HIGH){
+          lcd.setCursor(0,0);
+          lcd.print("BOX1:Abastece ");
+          digitalWrite(s1,LOW);//BOMBA DE ENTRADA1 OFF
+          digitalWrite(s2,LOW);//BOMBA DE ENTRADA2OFF
+          digitalWrite(s3,LOW);//VALVULA BALANCIM OFF ->BOX1
+          lcd.setCursor(0,1);
+          lcd.print("BOX2:Batelada ");
+          digitalWrite(s5,HIGH);//AERADOR2 ON
+        }
+        break;
+
+    case 3://BOX1 batelada1 BOX2 decanta
+        lcd.setCursor(0,0);
+        lcd.print("BOX1:Batelada ");
+        digitalWrite(s4,HIGH);//AERADOR1 ON
+        digitalWrite(s1,LOW);//BOMBA DE ENTRADA1 OFF
+        digitalWrite(s2,LOW);//BOMBA DE ENTRADA2OFF
+        lcd.setCursor(0,1);
+        lcd.print("BOX2:Decanta ");
+        digitalWrite(s5,LOW);//AERADOR2 OFF   
+        break; 
+
+    case 4://BOX1 batelada2 BOX2 descarte
+        if(box2Cheia == HIGH){
+          lcd.setCursor(0,0);
+          lcd.print("BOX1:Batelada ");
+          digitalWrite(s4,HIGH);//AERADOR1 ON
+          lcd.setCursor(0,1);
+          lcd.print("BOX2:Descarte ");
+          arduinoSlave.digitalWireWrite(endereco1, s7,HIGH);//VALVULA DESCARTE BOX2 ON
+          arduinoSlave.digitalWireWrite(endereco2, s12, HIGH);//DOSADORA CLORO ON
+        }else if(box2Cheia == LOW){
+          lcd.setCursor(0,0);
+          lcd.print("BOX1:Batelada ");
+          digitalWrite(s4,HIGH);//AERADOR1 ON
+          lcd.setCursor(0,1);
+          lcd.print("BOX2:Descarte ");
+          arduinoSlave.digitalWireWrite(endereco1, s7,LOW);//VALVULA DESCARTE BOX2 ON
+          arduinoSlave.digitalWireWrite(endereco2, s12, LOW);//DOSADORA CLORO ON
+        }       
+        break;
+
+    case 5://BOX1 batelada3 BOX2 abastece
+        if(box2Cheia == LOW){
+          if(entradaCheia == HIGH){
+            lcd.setCursor(0,0);
+            lcd.print("BOX1:Batelada ");
+            digitalWrite(s4,HIGH);//AERADOR1 ON
+            lcd.setCursor(0,1);
+            lcd.print("BOX2:Abastece ");
+            digitalWrite(s1,HIGH);//BOMBA DE ENTRADA1 ON
+            digitalWrite(s2,HIGH);//BOMBA DE ENTRADA2 ON
+            digitalWrite(s3,HIGH);//VALVULA BALANCIM ON ->BOX2
+          }else{
+            lcd.setCursor(0,0);
+            lcd.print("BOX1:Batelada ");
+            digitalWrite(s4,HIGH);//AERADOR1 ON
+            lcd.setCursor(0,1);
+            lcd.print("BOX2:Abastece ");
+            digitalWrite(s1,LOW);//BOMBA DE ENTRADA1 OFF
+            digitalWrite(s2,LOW);//BOMBA DE ENTRADA2 OFF
+            digitalWrite(s3,HIGH);//VALVULA BALANCIM ON ->BOX2
+          }
+        }else if(box2Cheia == HIGH){
+          lcd.setCursor(0,0);
+          lcd.print("BOX1:Batelada ");
+          digitalWrite(s4,HIGH);//AERADOR1 ON
+          lcd.setCursor(0,1);
+          lcd.print("BOX2:Abastece ");
+          digitalWrite(s1,LOW);//BOMBA DE ENTRADA1 OFF
+          digitalWrite(s2,LOW);//BOMBA DE ENTRADA2 OFF
+          digitalWrite(s3,HIGH);//VALVULA BALANCIM ON ->BOX2
+        }       
+        break;
+  
+    }
+
+}
