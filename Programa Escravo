@@ -1,0 +1,32 @@
+// INCLUSÃO DE BIBLIOTECAS
+#include <A2a.h>
+
+// DEFINIÇÃO DO ENDEREÇO DO SLAVE
+#define endereco2 12 // endereco1 10 placa E1, endereco2 12 placa E2
+
+// INSTANCIANDO OBJETOS
+A2a arduinoMaster;
+
+void setup() {
+  // INICIA A COMUNICAÇÃO ENTRE ARDUINOS COMO SLAVE NO ENDEREÇO DEFINIDO
+  arduinoMaster.begin(endereco2);
+
+  // FUNÇÕES PARA COMUNICAÇÃO
+  arduinoMaster.onReceive(receberDados);
+  arduinoMaster.onRequest(enviarDados);
+
+  digitalWrite(A3, LOW);
+
+}
+
+void loop() {
+
+}
+
+void receberDados() {
+  arduinoMaster.receiveData(); 
+}
+
+void enviarDados() {
+  arduinoMaster.sendData(); 
+}
