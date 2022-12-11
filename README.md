@@ -17,8 +17,13 @@ A comunicação entre as placas é realizado por meio do protocolo i2c, com liga
 O funcionamento Manual é simples, é posicionado a chave seletora em manual, cada um dos 11 push boton acionam uma saida correspondente, o qual aciona um motor, bomba ou
 valvula.
 
-.
-.
-.
+No funcionamento Automatico as placas realizam uma comunicação entre si e executam uma rotina de funcionamento que é na seguinte sequencia:
 
-em construção.
+ 1° - aciona agitador box1, desliga agitador box2, executa essa rotina por 1 hora e 20 minutos.
+ 2° - aciona agitador box1, aciona valvula de descarte do conteudo do box2 até  a boia de nivel minimo ser acionada, que fecha a valvula de descarte, executa essa rotina por 1 hora e 20 minutos .
+ 3° - aciona agitador box1, verifica o nivel do reservatorio de entrada, se estiver cheio abastece box2 até acionar o nivel maximo ou se esvaziar o reservatorio de entrada, desliga as bombas até encher o reservatorio de entrada e completar o nivel maximo do box2, executa essa rotina por 1 hora e 20 minutos ou completar o box2.
+ 4° - desliga o agitador box1, aciona agitador box2, executa essa rotina por 1 hora e 20 minutos.
+ 5° - aciona agitador box2, aciona valvula de descarte do conteudo do box1 até  a boia de nivel minimo ser acionada, que fecha a valvula de descarte, executa essa rotina por 1 hora e 20 minutos .
+ 6° - aciona agitador box2, verifica o nivel do reservatorio de entrada, se estiver cheio abastece box1 até acionar o nivel maximo ou se esvaziar o reservatorio de entrada, desliga as bombas até encher o reservatorio de entrada e completar o nivel maximo do box1, executa essa rotina por 1 hora e 20 minutos ou completar o box1.
+ 7° - reinicia todo o processo.
+ *no processo Automatico é informado no lcd os estados de execução de cada box.
